@@ -8,7 +8,7 @@ uses
 
 begin
   Application.Initialize;
-  Application.Title := 'CommManager';
+  Application.Title := 'ZP Comm Example';
   Application.CreateForm(TMainForm, MainForm);
   Application.Run;
 end.

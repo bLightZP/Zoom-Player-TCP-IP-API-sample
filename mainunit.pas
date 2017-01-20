@@ -4,7 +4,8 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, ExtCtrls, ComCtrls, TNTDialogs, Buttons, ScktComp;
+  Dialogs, StdCtrls, ExtCtrls, ComCtrls, TNTDialogs, Buttons, ScktComp,
+  XPMan;
 
 Const
   CommCode = WM_APP+444; // The message number used to communicate with Zoom Player
@@ -14,7 +15,6 @@ Const
 type
   TMainForm = class(TForm)
     IncomingGB: TGroupBox;
-    MSGMemo: TMemo;
     ConnectPanel: TPanel;
     WinAPIConnectButton: TButton;
     TCPConnectButton: TButton;
@@ -26,6 +26,9 @@ type
     LabelTextEntry: TLabel;
     TCPCommand: TMemo;
     SendButton: TSpeedButton;
+    MSGMemo: TMemo;
+    XPManifest1: TXPManifest;
+    ClearButton: TButton;
     procedure WinAPIConnectButtonClick(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure TCPConnectButtonClick(Sender: TObject);
@@ -33,6 +36,7 @@ type
     procedure BrowseButtonClick(Sender: TObject);
     procedure FormShow(Sender: TObject);
     procedure SendButtonClick(Sender: TObject);
+    procedure ClearButtonClick(Sender: TObject);
   private
     // Intercept Zoom Player messages
     procedure zpEvent(var M : TMessage); message CommCode;
@@ -53,12 +57,18 @@ var
   TCPBuf      : String;
   ZPTCPClient : TClientSocket    = nil;
   ZPTCPSocket : TCustomWinSocket = nil;
+  ConnectTS   : Int64;
 
 
 implementation
 
 {$R *.dfm}
 
+function FillSpace(S : WideString; Len : Integer) : WideString;
+begin
+  While Length(S) < Len do S := ' '+S;
+  Result := S;
+end;
 
 function StringFromAtom(sATOM : ATOM) : String;
 var
@@ -81,7 +91,7 @@ var
 begin
   Case M.WParam of
     1000 : Begin // Play State Changed
-             S := 'Play state changed: ';
+             S := '* Play state changed: ';
              Case M.LParam of
                0 : S1 := 'Closed';   // Also DVD Stop
                1 : S1 := 'Stopped';  // Media only
@@ -91,16 +101,16 @@ begin
              MSGMemo.Lines.Add(S+S1);
            End;
     1100 : Begin // TimeLine update (once per second)
-             MSGMemo.Lines.Add('Timeline: '+StringFromAtom(M.LParam));
+             MSGMemo.Lines.Add('* Timeline: '+StringFromAtom(M.LParam));
            End;
     1200 : Begin // On Screen Display Messages
-             MSGMemo.Lines.Add('OSD: '+StringFromAtom(M.LParam));
+             MSGMemo.Lines.Add('* OSD: '+StringFromAtom(M.LParam));
            End;
     1201 : Begin // On Screen Display Message has been removed
-             MSGMemo.Lines.Add('OSD Removed');
+             MSGMemo.Lines.Add('* OSD Removed');
            End;
     1300 : Begin // DVD & Media Mode changes
-             S := 'Mode change: Entering ';
+             S := '* Mode change: Entering ';
              Case M.LParam of
                0 : S1 := 'DVD';
                1 : S1 := 'Media';
@@ -108,34 +118,34 @@ begin
              MSGMemo.Lines.Add(S+S1+' mode');
            End;
     1400 : Begin // DVD Title Change
-             MSGMemo.Lines.Add('DVD Title: '+IntToStr(M.LParam));
+             MSGMemo.Lines.Add('* DVD Title: '+IntToStr(M.LParam));
            End;
     1450 : Begin // Current Unique string identifying the DVD disc
-             MSGMemo.Lines.Add('DVD Unique String: '+IntToStr(M.LParam));
+             MSGMemo.Lines.Add('* DVD Unique String: '+IntToStr(M.LParam));
            End;
     1500 : Begin // DVD Chapter Change
-             MSGMemo.Lines.Add('DVD Chapter: '+IntToStr(M.LParam));
+             MSGMemo.Lines.Add('* DVD Chapter: '+IntToStr(M.LParam));
            End;
     1600 : Begin // DVD Audio Change
-             MSGMemo.Lines.Add('DVD Audio: '+StringFromAtom(M.LParam));
+             MSGMemo.Lines.Add('* DVD Audio: '+StringFromAtom(M.LParam));
            End;
     1700 : Begin // DVD Subtitle Change
-             MSGMemo.Lines.Add('DVD Subtitle: '+StringFromAtom(M.LParam));
+             MSGMemo.Lines.Add('* DVD Subtitle: '+StringFromAtom(M.LParam));
            End;
     1800 : Begin // Media File Name
-             MSGMemo.Lines.Add('New Media File: '+StringFromAtom(M.LParam));
+             MSGMemo.Lines.Add('* New Media File: '+StringFromAtom(M.LParam));
            End;
     1900 : Begin // Position of Media file in play list
-             MSGMemo.Lines.Add('Media File play list track number: '+StringFromAtom(M.LParam));
+             MSGMemo.Lines.Add('* Media File play list track number: '+StringFromAtom(M.LParam));
            End;
     2000 : Begin // Video Resolution
-             MSGMemo.Lines.Add('Video Resolution: '+StringFromAtom(M.LParam));
+             MSGMemo.Lines.Add('* Video Resolution: '+StringFromAtom(M.LParam));
            End;
     2100 : Begin // Video Frame Rate
-             MSGMemo.Lines.Add('Video FPS: '+StringFromAtom(M.LParam));
+             MSGMemo.Lines.Add('* Video FPS: '+StringFromAtom(M.LParam));
            End;
     2200 : Begin // AR Changed
-             MSGMemo.Lines.Add('AR Changed to: '+StringFromAtom(M.LParam));
+             MSGMemo.Lines.Add('* AR Changed to: '+StringFromAtom(M.LParam));
            End;
   End;
 end;
@@ -193,8 +203,25 @@ end;
 
 
 procedure TMainForm.SendButtonClick(Sender: TObject);
+var
+  I : Integer;
+  S : WideString;
 begin
-  If ZPTCPClient <> nil then ZPTCPSendText(TCPCommand.Text);
+  If ZPTCPClient <> nil then
+  Begin
+    If TCPCommand.Lines.Count = 0 then Exit;
+    
+    If TCPCommand.Lines.Count > 1 then
+    Begin
+      S := '';
+      For I := 0 to TCPCommand.Lines.Count-1 do S := S+'"'+TCPCommand.Lines[I]+'" ';
+    End
+    Else S := TCPCommand.Lines[0];
+
+    MSGMemo.Text := MSGMemo.Text+'OUT '+FillSpace(IntToStr(GetTickCount-ConnectTS),8)+'ms : '+S+CRLF;
+    ZPTCPSendText(TCPCommand.Text);
+    TCPCommand.Clear;
+  End;
 end;
 
 
@@ -224,7 +251,7 @@ begin
     End;
   Except
     FreeAndNil(ZPTCPClient);
-    MSGMemo.Lines.Add('Unable to Connect');
+    MSGMemo.Lines.Add('*** Unable to Connect');
   End;
 end;
 
@@ -246,8 +273,9 @@ end;
 
 procedure TMainForm.ZPTCPClientConnect(Sender: TObject; Socket: TCustomWinSocket);
 begin
+  ConnectTS := GetTickCount;
   ZPTCPSocket := Socket;
-  MSGMemo.Lines.Add('Connected');
+  MSGMemo.Lines.Add('*** Connected');
   TCPConnectButton.Enabled := True;
   TCPConnectButton.Caption := 'TCP Disconnect';
 end;
@@ -257,7 +285,7 @@ procedure TMainForm.ZPTCPClientDisconnect(Sender: TObject; Socket: TCustomWinSoc
 begin
   If ZPTCPClient <> nil then
   Begin
-    MSGMemo.Lines.Add('Disconnected');
+    MSGMemo.Lines.Add('*** Disconnected'+CRLF);
     TCPConnectButton.Enabled := True;
     TCPConnectButton.Caption := 'TCP Connect';
     ZPTCPSocket := nil;
@@ -280,7 +308,15 @@ begin
       I := Pos(CRLF,TCPBuf);
       S := Copy(TCPBuf,1,I-1);
       Delete(TCPBuf,1,I+1);
-      MSGMemo.Lines.Add(S);
+      MSGMemo.Lines.Add('IN  '+FillSpace(IntToStr(GetTickCount-ConnectTS),8)+'ms : '+S);
+
+      // Trigger event on stop example:
+      {If S = '1000 0' then
+      Begin
+        TCPCommand.Text := '5100 fnMediaNav';
+        Application.ProcessMessages;
+        SendButton.Click;
+      End;}
     End;
   End;
 end;
@@ -290,12 +326,12 @@ procedure TMainForm.ZPTCPClientError(Sender: TObject; Socket: TCustomWinSocket; 
 begin
   If ErrorCode = 10061 then
   Begin
-    MSGMemo.Lines.Add('Error #10061 - Unable to Connect');
+    MSGMemo.Lines.Add('*** Error #10061 - Unable to Connect');
     ErrorCode := 0;
   End;
   If ErrorCode = 10053 then
   Begin
-    MSGMemo.Lines.Add('Error #10053 - Server has disconnected/shutdown.');
+    MSGMemo.Lines.Add('*** Error #10053 - Server has disconnected/shutdown.');
     ErrorCode := 0;
   End;
 end;
@@ -305,9 +341,15 @@ procedure TMainForm.ZPTCPSendText(S : String);
 var
   I : Integer;
 begin
-  If ZPTCPSocket <> nil then ZPTCPSocket.SendText(S);
+  If ZPTCPSocket <> nil then ZPTCPSocket.SendText(S+CRLF);
 end;
 
 
+
+
+procedure TMainForm.ClearButtonClick(Sender: TObject);
+begin
+  MSGMemo.Clear;
+end;
 
 end.

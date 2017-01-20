@@ -1,9 +1,9 @@
 object MainForm: TMainForm
-  Left = 246
-  Top = 131
-  Width = 561
-  Height = 371
-  Caption = 'Zoom Player Communication & Control Sample Application v3.00'
+  Left = 433
+  Top = 228
+  Width = 573
+  Height = 576
+  Caption = 'Zoom Player Communication & Control Sample Application v3.2'
   Color = clBtnFace
   Constraints.MinHeight = 300
   Constraints.MinWidth = 300
@@ -16,45 +16,62 @@ object MainForm: TMainForm
   OnClose = FormClose
   OnShow = FormShow
   DesignSize = (
-    549
-    340)
+    557
+    541)
   PixelsPerInch = 96
   TextHeight = 13
   object IncomingGB: TGroupBox
     Left = 6
-    Top = 166
-    Width = 538
-    Height = 168
+    Top = 168
+    Width = 546
+    Height = 366
     Anchors = [akLeft, akTop, akRight, akBottom]
-    Caption = ' Incoming Messages : '
+    Caption = ' Traffic log : '
     TabOrder = 0
     DesignSize = (
-      538
-      168)
+      546
+      366)
     object MSGMemo: TMemo
       Left = 8
       Top = 20
-      Width = 521
-      Height = 139
+      Width = 529
+      Height = 307
       Anchors = [akLeft, akTop, akRight, akBottom]
       Color = clBtnFace
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'Courier New'
+      Font.Style = []
+      ParentFont = False
+      ReadOnly = True
+      ScrollBars = ssVertical
       TabOrder = 0
+    end
+    object ClearButton: TButton
+      Left = 442
+      Top = 332
+      Width = 95
+      Height = 25
+      Caption = 'Clear'
+      TabOrder = 1
+      OnClick = ClearButtonClick
     end
   end
   object ConnectPanel: TPanel
     Left = 6
     Top = 6
-    Width = 538
+    Width = 546
     Height = 157
     Anchors = [akLeft, akTop, akRight]
     BevelInner = bvRaised
     BevelOuter = bvLowered
     TabOrder = 1
     DesignSize = (
-      538
+      546
       157)
     object LabelConnectTo: TLabel
-      Left = 292
+      Left = 300
       Top = 13
       Width = 55
       Height = 13
@@ -69,7 +86,7 @@ object MainForm: TMainForm
       Caption = 'TCP Text Entry:'
     end
     object SendButton: TSpeedButton
-      Left = 429
+      Left = 437
       Top = 123
       Width = 100
       Height = 25
@@ -115,7 +132,7 @@ object MainForm: TMainForm
       OnClick = PlayButtonClick
     end
     object TCPAddress: TEdit
-      Left = 354
+      Left = 362
       Top = 9
       Width = 117
       Height = 21
@@ -124,7 +141,7 @@ object MainForm: TMainForm
       Text = '127.0.0.1'
     end
     object PortEdit: TEdit
-      Left = 475
+      Left = 483
       Top = 9
       Width = 55
       Height = 21
@@ -135,10 +152,14 @@ object MainForm: TMainForm
     object TCPCommand: TMemo
       Left = 8
       Top = 59
-      Width = 521
+      Width = 529
       Height = 60
       Anchors = [akLeft, akTop, akRight]
       TabOrder = 6
     end
+  end
+  object XPManifest1: TXPManifest
+    Left = 22
+    Top = 74
   end
 end
